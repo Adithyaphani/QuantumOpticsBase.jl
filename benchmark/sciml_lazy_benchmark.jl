@@ -1,13 +1,12 @@
 # benchmark/sciml_lazy_benchmark.jl
 #
 # Comparative benchmark: QuantumOpticsBase native lazy operators
-# vs SciMLOperators-backed prototype.
+# vs SciMLOperators-backed wrapper.
 #
 # Usage:
 #   cd QuantumOpticsBase.jl
 #   julia --project=benchmark benchmark/sciml_lazy_benchmark.jl
 #
-# Output: a Markdown table of minimum times (BenchmarkTools, 200-sample budget).
 
 using BenchmarkTools
 using QuantumOpticsBase
@@ -18,10 +17,6 @@ using Printf
 BenchmarkTools.DEFAULT_PARAMETERS.samples  = 200
 BenchmarkTools.DEFAULT_PARAMETERS.seconds  = 2.0
 BenchmarkTools.DEFAULT_PARAMETERS.evals    = 1
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
 fmt(t) = @sprintf("%.2f μs", t * 1e6)
 
@@ -37,11 +32,8 @@ function run_triple(label, lazy_op, psi)
         label, fmt(t_lazy), fmt(t_sciml), fmt(t_cached))
 end
 
-# ---------------------------------------------------------------------------
-# Print header
-# ---------------------------------------------------------------------------
 println()
-println("## SciMLOperators prototype benchmark")
+println("## SciMLOperators benchmark")
 println()
 println("Julia $(VERSION), SciMLOperators $(pkgversion(SciMLOperators))")
 println()
@@ -52,11 +44,8 @@ println("|" * "-"^47 * "|" * "-"^12 * "|" * "-"^16 * "|" * "-"^15 * "|")
 b0 = SpinBasis(1//2)
 b1 = SpinBasis(1)
 sx, sy, sz = sigmax(b0), sigmay(b0), sigmaz(b0)
-sp, sm     = sigmap(b0), sigmam(b0)
 
-# ---------------------------------------------------------------------------
-# 1. LazySum: local transverse-field terms on spin chains (n = 4, 6, 8)
-# ---------------------------------------------------------------------------
+# LazySum: transverse-field chains (n = 4, 6, 8)
 for n in (4, 6, 8)
     b  = tensor(fill(b0, n)...)
     H  = LazySum([LazyTensor(b, k, sx) for k in 1:n]...)
@@ -64,9 +53,7 @@ for n in (4, 6, 8)
     run_triple("LazySum  n=$n (transverse field)", H, psi)
 end
 
-# ---------------------------------------------------------------------------
-# 2. LazyProduct: depth-2, -4, -6 chains
-# ---------------------------------------------------------------------------
+# LazyProduct: depth-2/4/6
 for depth in (2, 4, 6)
     n  = max(depth, 4)
     b  = tensor(fill(b0, n)...)
@@ -76,9 +63,7 @@ for depth in (2, 4, 6)
     run_triple("LazyProduct  depth=$depth n=$n", P, psi)
 end
 
-# ---------------------------------------------------------------------------
-# 3. LazyTensor: edge vs mid, dense vs sparse, spin-½ n=6
-# ---------------------------------------------------------------------------
+# LazyTensor: edge vs mid, dense vs sparse, n=6
 let n = 6, b = tensor(fill(b0, n)...)
     psi = Ket(b, normalize!(randn(ComplexF64, length(b))))
 
@@ -89,9 +74,7 @@ let n = 6, b = tensor(fill(b0, n)...)
     run_triple("LazyTensor  edge-1  sparse n=$n", LazyTensor(b, 1, SparseOperator(sx)), psi)
 end
 
-# ---------------------------------------------------------------------------
-# 4. LazyTensor: spin-1 local dimension (d=3)
-# ---------------------------------------------------------------------------
+# LazyTensor: spin-1 (d=3)
 let n = 4, b = tensor(fill(b1, n)...),
     sx1 = sigmax(b1), sz1 = sigmaz(b1)
     psi = Ket(b, normalize!(randn(ComplexF64, length(b))))
@@ -100,9 +83,7 @@ let n = 4, b = tensor(fill(b1, n)...),
     run_triple("LazyTensor  mid-3   spin-1 n=$n", LazyTensor(b, 3, sz1), psi)
 end
 
-# ---------------------------------------------------------------------------
-# 5. Mixed Heisenberg-like Hamiltonian (nearest-neighbour XX+YY+ZZ)
-# ---------------------------------------------------------------------------
+# Heisenberg XX+YY+ZZ nearest-neighbour
 for n in (4, 6)
     b  = tensor(fill(b0, n)...)
     psi = Ket(b, normalize!(randn(ComplexF64, length(b))))
@@ -117,6 +98,4 @@ for n in (4, 6)
 end
 
 println()
-println("> Timings are minimum over $(BenchmarkTools.DEFAULT_PARAMETERS.samples) samples.")
-println("> 'SciML uncached' allocates intermediate buffers on every call.")
-println("> 'SciML cached'  pre-allocates via `cache_sciml_lazy_operator`.")
+println("> Timings: minimum over $(BenchmarkTools.DEFAULT_PARAMETERS.samples) samples.")

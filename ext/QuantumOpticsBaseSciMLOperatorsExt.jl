@@ -10,9 +10,7 @@ import QuantumOpticsBase: AbstractOperator, Operator, Ket, Bra,
 
 export SciMLOperatorWrapper
 
-# ---------------------------------------------------------------------------
-# Core wrapper
-# ---------------------------------------------------------------------------
+# core wrapper
 
 """
     SciMLOperatorWrapper{BL,BR,T} <: AbstractOperator{BL,BR}
@@ -29,9 +27,7 @@ end
 Base.eltype(::SciMLOperatorWrapper{BL,BR,T}) where {BL,BR,T} = eltype(T)
 Base.size(w::SciMLOperatorWrapper) = (length(w.basis_l), length(w.basis_r))
 
-# ---------------------------------------------------------------------------
-# Conversion helpers: QO types → SciML operator trees
-# ---------------------------------------------------------------------------
+# conversion helpers
 
 function _qo_to_sciml(op::Operator)
     MatrixOperator(op.data)
@@ -76,23 +72,20 @@ function _qo_to_sciml(op::LazyTensor)
             MatrixOperator(Matrix{T}(I, d, d))
         end
     end
-    # QuantumOpticsBase uses Fortran/column-major ordering: site 1 is the
-    # fastest-varying index (stride 1). SciMLOperators' TensorProductOperator
-    # uses C/row-major ordering: the first argument is slowest-varying.
-    # Reversing aligns the two conventions.
+    # QOB: site 1 = fast index (col-major).
+    # TensorProductOperator: first arg = slow index (row-major).
+    # reverse() corrects the mismatch.
     tp = TensorProductOperator(reverse(site_ops)...)
     isone(op.factor) ? tp : op.factor * tp
 end
 
-# ---------------------------------------------------------------------------
-# Public API
-# ---------------------------------------------------------------------------
+# public API
 
 """
     sciml_lazy_operator(op::AbstractOperator) -> SciMLOperatorWrapper
 
 Convert a QuantumOpticsBase lazy operator to a SciMLOperators-backed wrapper,
-preserving `basis_l` and `basis_r`. Requires `SciMLOperators` to be loaded.
+preserving `basis_l` and `basis_r`.
 
 ```julia
 using QuantumOpticsBase, SciMLOperators
@@ -113,15 +106,13 @@ end
     cache_sciml_lazy_operator(w::SciMLOperatorWrapper, u::AbstractVector)
 
 Pre-allocate intermediate buffers via `SciMLOperators.cache_operator`.
-Repeated `mul!` calls on the returned wrapper avoid per-call heap allocation.
+Call once before a tight `mul!` loop.
 """
 function QuantumOpticsBase.cache_sciml_lazy_operator(w::SciMLOperatorWrapper, u::AbstractVector)
     SciMLOperatorWrapper(w.basis_l, w.basis_r, cache_operator(w.sciml_op, u))
 end
 
-# ---------------------------------------------------------------------------
-# QuantumOpticsBase interface
-# ---------------------------------------------------------------------------
+# QO interface
 
 function QuantumOpticsBase.dense(w::SciMLOperatorWrapper)
     n   = length(w.basis_l)
@@ -129,8 +120,7 @@ function QuantumOpticsBase.dense(w::SciMLOperatorWrapper)
     dat = zeros(ComplexF64, n, m)
     e_j = zeros(ComplexF64, m)
     col = zeros(ComplexF64, n)
-    # TensorProductOperator (and any tree containing it) requires cache before mul!.
-    # dense() is O(n^2) allocation anyway, so caching here is fine.
+    # cache_operator needed before mul! on any tree containing TensorProductOperator
     cached_op = cache_operator(w.sciml_op, e_j)
     for j in 1:m
         e_j[j] = one(ComplexF64)

@@ -1,6 +1,5 @@
 # test/test_sciml_lazy_operators.jl
-# Correctness tests for the SciMLOperators package extension.
-# Discovered automatically by TestItemRunner — no runtests.jl edit needed.
+# Tests for the SciMLOperators extension.
 
 @testitem "SciMLOperators: wrapper type and exports" tags=[:sciml] begin
     using QuantumOpticsBase, SciMLOperators, LinearAlgebra
